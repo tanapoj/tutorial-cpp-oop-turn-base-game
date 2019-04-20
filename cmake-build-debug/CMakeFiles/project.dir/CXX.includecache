@@ -1,0 +1,36 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/Users/nartra/Documents/tutor_space/sun2/oop/project/Field.h
+iostream
+-
+config.h
+/Users/nartra/Documents/tutor_space/sun2/oop/project/config.h
+character.h
+/Users/nartra/Documents/tutor_space/sun2/oop/project/character.h
+
+/Users/nartra/Documents/tutor_space/sun2/oop/project/character.h
+iostream
+-
+config.h
+/Users/nartra/Documents/tutor_space/sun2/oop/project/config.h
+Field.h
+/Users/nartra/Documents/tutor_space/sun2/oop/project/Field.h
+
+/Users/nartra/Documents/tutor_space/sun2/oop/project/config.h
+
+/Users/nartra/Documents/tutor_space/sun2/oop/project/main.cpp
+iostream
+-
+vector
+-
+config.h
+/Users/nartra/Documents/tutor_space/sun2/oop/project/config.h
+character.h
+/Users/nartra/Documents/tutor_space/sun2/oop/project/character.h
+
