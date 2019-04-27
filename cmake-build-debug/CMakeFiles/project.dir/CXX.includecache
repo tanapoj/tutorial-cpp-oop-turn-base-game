@@ -27,7 +27,17 @@ Field.h
 /Users/nartra/Documents/tutor_space/sun2/oop/project/main.cpp
 iostream
 -
+stdio.h
+-
 vector
+-
+random
+-
+sstream
+-
+string
+-
+ctime
 -
 config.h
 /Users/nartra/Documents/tutor_space/sun2/oop/project/config.h

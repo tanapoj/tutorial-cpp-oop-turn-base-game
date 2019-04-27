@@ -10,12 +10,19 @@ using namespace std;
 class Action {
 protected:
     Unit *unit;
+    int rate = 1;
 public:
     Action(Unit *unit);
 
     virtual string name();
 
-    virtual void invoke(Field* field, int player, int position);
+    virtual void invoke(Field *field, int player, int position);
+
+    virtual void setRate(int rate);
+
+    virtual int getRate();
+
+    virtual int getType();
 };
 
 class Unit {
@@ -38,7 +45,9 @@ public:
 
     int getHp();
 
-    string getInfo();
+    virtual string getInfo();
+
+    int getBeTargetRate();
 
     bool canBeTarget();
 
@@ -48,9 +57,15 @@ public:
 
     bool isAlive();
 
-    void whenTurnStart(Field *field);
+    bool isAvailableToUseSkill();
 
-    void whenTurnEnd(Field *field);
+    bool isAvailableToAttackl();
+
+    virtual void useSkill(Field *field);
+
+    virtual void whenTurnStart(Field *field);
+
+    virtual void whenTurnEnd(Field *field);
 };
 
 

@@ -10,21 +10,26 @@ using namespace std;
 class Unit;
 
 class Field {
-private:
+protected:
     int round = 1;
-    Unit *units[2][CHARACTER_PER_LINE];
+    Unit *units[NUMBER_OF_PLAYERS][CHARACTER_PER_LINE];
 public:
+
     void setUnit(int player, int position, Unit *character);
 
     Unit *getUnit(int player, int position);
 
     int getRound();
 
+    void enterRound();
+
     void endRound();
 
     int getPlayer();
 
     string getInfo();
+
+    int getOwnerOf(Unit *unit);
 };
 
 #endif //PROJECT_FIELD_H
