@@ -27,6 +27,40 @@ string spacePadNumber(int num, int digit = 2) {
     return ret;
 }
 
+void callInvokeAction(Action *action, Field *field, int position) {
+    int player = field->getPlayer();
+    action->invoke(field, player, position);
+}
+
+Action *callInvokeActions(vector<Action *> actions, Field *field, int actionType) {
+    int player = field->getPlayer();
+    int sum = 0, i;
+    for (auto &action : actions) {
+        if (action->getType() != actionType) {
+            continue;
+        }
+        sum += action->getRate();
+    }
+    if (sum < 1) {
+        return actions[0];
+    }
+    int r = randomInt(1, sum);
+    sum = 0;
+    for (auto &action : actions) {
+        if (action->getType() != actionType) {
+            continue;
+        }
+        sum += action->getRate();
+        if (sum >= r) {
+            callInvokeAction(action, field, -1);
+            return action;
+        }
+    }
+}
+
+
+
+
 //=== Field ========================================================
 
 void Field::setUnit(int player, int position, Unit *character) {
@@ -149,11 +183,11 @@ public:
     }
 
     string name() override {
-        return "action : skill!";
+        return "action : " + unit->getName() + " use skill '" + unit->getSkillName() + "'";
     }
 
     void invoke(Field *field, int player, int position) override {
-
+        unit->useSkill(field);
     }
 
     int getType() override {
@@ -195,11 +229,16 @@ int Unit::getHp() {
 }
 
 string Unit::getInfo() {
-    return "Unit[ "
+    return "  Unit[ "
            + getName()
-           + ", Attack: " + spacePadNumber(getAtk())
-           + ", Hitpoints: " + spacePadNumber(getHp())
-           + " ]";
+           + ", HP: " + spacePadNumber(getHp())
+           + ", AT: " + spacePadNumber(getAtk())
+           + "        ]"
+           + to_string(getBeTargetRate());
+}
+
+string Unit::getSkillName() {
+    return "-no skill-";
 }
 
 int Unit::getBeTargetRate() {
@@ -242,13 +281,17 @@ void Unit::whenTurnEnd(Field *field) {
 
 }
 
+bool Unit::isStillCooldown() {
+    return false;
+}
+
 //=== Unit: Cooldownale ===
 
 class UnitCooldownable : public Unit {
 protected:
     int cooldown = 0;
 public:
-    UnitCooldownable(const string &name, int atk, int hp) : Unit(name, atk, hp) {}
+    UnitCooldownable(string name, int atk, int hp) : Unit(name, atk, hp) {}
 
     bool isStillCooldown() {
         return cooldown > 0;
@@ -267,29 +310,37 @@ public:
 
 class UnitHealer : public UnitCooldownable {
 public:
-    UnitHealer(const string &name, int atk, int hp) : UnitCooldownable(name, atk, hp) {
-        cout << "H" << endl;
+    UnitHealer(string name, int atk, int hp) : UnitCooldownable(name, atk, hp) {
     }
 
     void useSkill(Field *field) override {
         int player = field->getOwnerOf(this);
         int minPosition = 0;
         for (int position = 0; position < CHARACTER_PER_LINE; position++) {
-            if (field->getUnit(player, position)->getHp() < field->getUnit(player, minPosition)->getHp()) {
+            if (field->getUnit(player, position)->getHp() < field->getUnit(player, minPosition)->getHp() && field->getUnit(player, position)->isAlive()) {
                 minPosition = position;
             }
         }
         Unit *unit = field->getUnit(player, minPosition);
-        unit->setHp(unit->getHp() + 5);
+        int before = unit->getHp();
+        unit->setHp(unit->getHp() + HEAL_POINT);
+        int after = unit->getHp();
+        cout << "healing to " << unit->getName() << "(" << before << " -> " << after << ")" << endl;
+        setCooldown(HEAL_COOL_DOWN_TURN);
     }
 
-    string getInfo() override {
+    string getInfo() {
         return "Healer[ "
                + getName()
-               + ", Attack: " + spacePadNumber(getAtk())
-               + ", Hitpoints: " + spacePadNumber(getHp())
-               + ", CD: " + spacePadNumber(cooldown)
-               + " ]";
+               + ", HP: " + spacePadNumber(getHp())
+               + ", AT: " + spacePadNumber(getAtk())
+               + ", C: " + spacePadNumber(cooldown)
+               + " ]"
+               + to_string(getBeTargetRate());
+    }
+
+    string getSkillName() {
+        return "healing";
     }
 };
 
@@ -297,7 +348,81 @@ public:
 
 //=== Unit: Tank ===
 
+class UnitTank : public UnitCooldownable {
+private:
+    int rate = 1;
+public:
+
+    UnitTank(const string &name, int atk, int hp) : UnitCooldownable(name, atk, hp) {}
+
+    void useSkill(Field *field) override {
+        rate = TANK_TARGET_RATE;
+        setCooldown(TANK_COOL_DOWN_TURN);
+    }
+
+    int getBeTargetRate() {
+//        cout << getName() << " " << isStillCooldown() << " " << rate << endl;
+        if (!isStillCooldown()) {
+            return 1;
+        }
+        return rate;
+    }
+
+    string getInfo() {
+        return "  Tank[ "
+               + getName()
+               + ", HP: " + spacePadNumber(getHp())
+               + ", AT: " + spacePadNumber(getAtk())
+               + ", C: " + spacePadNumber(cooldown)
+               + " ]"
+               + to_string(getBeTargetRate());
+    }
+
+    string getSkillName() {
+        return "rate up!";
+    }
+};
+
 //=== Unit: DamageDealer ===
+
+class UnitDamage : public UnitCooldownable {
+public:
+    UnitDamage(const string &name, int atk, int hp) : UnitCooldownable(name, atk, hp) {}
+
+
+    void useSkill(Field *field) override {
+
+        for (int i = 0; i < 2; i++) {
+            vector<Action *> actions;
+            for (int i = 0; i < CHARACTER_PER_LINE; i++) {
+                Unit *opponentUnit = field->getUnit(!field->getOwnerOf(this), i);
+                if (opponentUnit->isAlive() && opponentUnit->canBeTarget()) {
+                    ActionAttack *a = new ActionAttack(this);
+                    a->setTargetUnit(opponentUnit);
+                    actions.push_back(a);
+                }
+            }
+            cout << callInvokeActions(actions, field, ACTION_TYPE_ATTACK)->name() << endl;
+        }
+
+        setCooldown(DAMAGE_COOL_DOWN_TURN);
+    }
+
+    string getInfo() {
+        return "Damage[ "
+               + getName()
+               + ", HP: " + spacePadNumber(getHp())
+               + ", AT: " + spacePadNumber(getAtk())
+               + ", C: " + spacePadNumber(cooldown)
+               + " ]"
+               + to_string(getBeTargetRate());
+    }
+
+    string getSkillName() {
+        return "double atk!";
+    }
+
+};
 
 
 //=== Controller ========================================================
@@ -350,10 +475,17 @@ public:
                 string names(1, name++);
 
                 Unit *character;
-                switch (randomInt(0, 9)) {
+                switch (randomInt(1, 5)) {
                     case 1:
                     case 2:
                         character = new UnitHealer(names, randomInt(5, 7), randomInt(10, 12));
+                        break;
+                    case 3:
+                        character = new UnitDamage(names, randomInt(7,10), randomInt(7, 10));
+                        break;
+                    case 4:
+                        character = new UnitTank(names, randomInt(5, 7), randomInt(10, 20));
+                        break;
                     default:
                         character = new Unit(names, randomInt(5, 7), randomInt(10, 12));
                 }
@@ -393,36 +525,18 @@ public:
                 actions.push_back(a);
             }
         }
-//        actions.push_back(new ActionSkill(field->getUnit(player, position)));
+        Unit *me = field->getUnit(player, position);
+        if (!me->isStillCooldown()) {
+            ActionSkill *s = new ActionSkill(me);
+            s->setTargetUnit(me);
+            actions.push_back(s);
+        }
         return actions;
     }
 
     Action *invokeActions(vector<Action *> actions, int actionType) {
-        int player = field->getPlayer();
-        int sum = 0;
-        for (auto &action : actions) {
-            if (action->getType() != actionType) {
-                continue;
-            }
-            sum += action->getRate();
-        }
-        int r = randomInt(1, sum);
-        sum = 0;
-        for (auto &action : actions) {
-            if (action->getType() != actionType) {
-                continue;
-            }
-            sum += action->getRate();
-            if (sum >= r) {
-                invokeAction(action, -1);
-                return action;
-            }
-        }
-    }
-
-    void invokeAction(Action *action, int position) {
-        int player = field->getPlayer();
-        action->invoke(field, player, position);
+        //cout << "ACTION_TYPE_SKILL " << actionType << endl;
+        return callInvokeActions(actions, field, actionType);
     }
 };
 
@@ -435,12 +549,16 @@ int main() {
     Controller controller;
     controller.initialCharacters();
 
+    int selectUnit = 0;
+    int selectAction = 0;
+    Action *action;
+
     while (i > 0 && !controller.isGameEnd()) {
         controller.startRound();
         cout << controller.getInfo() << endl;
         int player = controller.getPlayer();
 
-        int selectUnit = 0;
+        selectUnit = 0;
         if (player == PLAYER_A) {
             cout << "select your unit?" << endl;
             for (int position = 0; position < CHARACTER_PER_LINE; position++) {
@@ -450,15 +568,48 @@ int main() {
                 }
             }
             cin >> selectUnit;
+        } else {
+            selectUnit = -1;
+            int limit = 20;
+            while (selectUnit < 0) {
+                selectUnit = randomInt(0, CHARACTER_PER_LINE - 1);
+                if (!controller.field->getUnit(player, selectAction)->isAlive()) {
+                    selectUnit = -1;
+                }
+                limit--;
+                if (limit < 0) {
+                    selectUnit = 0;
+                    break;
+                }
+            }
         }
 
         vector<Action *> actions = controller.selectUnit(player, selectUnit);
 
-        cout << "attack or skill?" << endl;
-        cout << ACTION_TYPE_ATTACK << ". attack" << endl;
-        cout << ACTION_TYPE_SKILL << ". use skill" << endl;
+        selectAction = 1;
+        if (player == PLAYER_A) {
+            cout << ACTION_TYPE_ATTACK << ". attack" << endl;
+            if (!controller.field->getUnit(player, selectUnit)->isStillCooldown()) {
+                cout << ACTION_TYPE_SKILL << ". use skill" << endl;
+            }
 
-        Action *action = controller.invokeActions(actions, ACTION_TYPE_ATTACK);
+            cin >> selectAction;
+        } else {
+            if (controller.field->getUnit(player, selectUnit)->isStillCooldown()) {
+                selectAction = ACTION_TYPE_ATTACK;
+            } else {
+                selectAction = randomInt(1, 2);
+            }
+        }
+
+        switch (selectAction) {
+            case ACTION_TYPE_ATTACK:
+                action = controller.invokeActions(actions, ACTION_TYPE_ATTACK);
+                break;
+            case ACTION_TYPE_SKILL:
+                action = controller.invokeActions(actions, ACTION_TYPE_SKILL);
+                break;
+        }
         cout << action->name() << endl;
 
         controller.endRound();

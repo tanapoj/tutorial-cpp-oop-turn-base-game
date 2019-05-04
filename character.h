@@ -47,7 +47,9 @@ public:
 
     virtual string getInfo();
 
-    int getBeTargetRate();
+    virtual string getSkillName();
+
+    virtual int getBeTargetRate();
 
     bool canBeTarget();
 
@@ -66,6 +68,8 @@ public:
     virtual void whenTurnStart(Field *field);
 
     virtual void whenTurnEnd(Field *field);
+
+    virtual bool isStillCooldown();
 };
 
 
