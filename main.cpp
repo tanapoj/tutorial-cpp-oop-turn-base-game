@@ -56,6 +56,7 @@ Action *callInvokeActions(vector<Action *> actions, Field *field, int actionType
             return action;
         }
     }
+    return NULL;
 }
 
 
